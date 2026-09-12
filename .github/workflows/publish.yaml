@@ -1,0 +1,60 @@
+name: Build and upload CV
+
+on:
+  push:
+    branches: '**'
+
+# a push happening while a previous pipeline
+# is still running interrupts it
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MIN_PDF_SIZE: 50000
+
+jobs:
+  cv:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build chromium image
+        run: docker build -t chromium-headless .
+
+      - name: Generate PDFs
+        run: |
+          for lang in en fr; do
+            docker run --rm \
+              -v "$PWD:/work" -w /work \
+              chromium-headless \
+              chromium --headless --no-sandbox \
+                --print-to-pdf="cv_zouiten_${lang}.pdf" \
+                "src/cv_zouiten_${lang}.html"
+          done
+          sudo chown "$(id -u):$(id -g)" cv_zouiten_*.pdf
+
+      - name: Check PDFs size
+        run: |
+          for file in cv_zouiten_en.pdf cv_zouiten_fr.pdf; do
+            size=$(stat -c %s "$file")
+            if [ "$size" -lt "$MIN_PDF_SIZE" ]; then
+              echo "::error file=$file::$file is smaller than $MIN_PDF_SIZE bytes ($size bytes), the generated PDF is probably broken."
+              exit 1
+            fi
+            echo "$file: $size bytes"
+          done
+
+      - name: Upload PDFs
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          UPLOAD_USR: ${{ secrets.CV_UPLOAD_USR }}
+          UPLOAD_PSW: ${{ secrets.CV_UPLOAD_PSW }}
+        run: |
+          for file in cv_zouiten_en.pdf cv_zouiten_fr.pdf; do
+            curl --fail-with-body -T "$file" \
+              -u "$UPLOAD_USR:$UPLOAD_PSW" \
+              "https://cv.zouizoui.ovh/api/$file"
+          done
