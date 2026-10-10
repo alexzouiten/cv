@@ -56,5 +56,5 @@ jobs:
           for file in cv_zouiten_en.pdf cv_zouiten_fr.pdf; do
             curl --fail-with-body -T "$file" \
               -u "$UPLOAD_USR:$UPLOAD_PSW" \
-              "https://cv.zouizoui.ovh/api/$file"
+              "https://cv.zouizoui.ovh/$file"
           done
