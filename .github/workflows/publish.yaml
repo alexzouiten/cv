@@ -54,7 +54,7 @@ jobs:
           UPLOAD_PSW: ${{ secrets.CV_UPLOAD_PSW }}
         run: |
           for file in cv_zouiten_en.pdf cv_zouiten_fr.pdf; do
-            curl --fail-with-body -T "$file" \
+            curl -T "$file" \
               -u "$UPLOAD_USR:$UPLOAD_PSW" \
               "https://cv.zouizoui.ovh/$file"
           done
